@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31410.357
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MidiBackup", "MidiBackup\MidiBackup.csproj", "{15CA770A-772F-421A-97BA-10B69A7D64B5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {918AFF8B-4DE2-4859-8AD8-F00E6D6ECB26}
+	EndGlobalSection
+EndGlobal
