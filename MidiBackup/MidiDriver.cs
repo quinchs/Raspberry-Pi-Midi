@@ -46,7 +46,6 @@ namespace MidiBackup
         public async Task Start()
         {
             var files = Directory.GetFiles("/dev/snd");
-            //Console.WriteLine(string.Join(", ", files));
             var MidiFile = files.FirstOrDefault(x => x.Contains("midi"));
 
             if (MidiFile != null)

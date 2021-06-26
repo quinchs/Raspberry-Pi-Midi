@@ -140,6 +140,8 @@ namespace MidiBackup
     public class ProgramMessage : MidiMessage
     {
         public Instrument Instrument { get; }
+        public byte InstrumentValue
+            => Data[0];
         public ProgramMessage(MidiPacket pack)
             : base(pack)
         {

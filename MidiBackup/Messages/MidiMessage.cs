@@ -15,7 +15,6 @@ namespace MidiBackup
         }
     }
 
-
 	public enum StatusType : byte
 	{
 		NoteOff = 0x80,
@@ -190,29 +189,6 @@ namespace MidiBackup
 					default:
 						return (byte)(Value & 0xF0);
 				}
-			}
-		}
-
-		public static byte FixedDataSize(byte statusByte)
-		{
-			switch ((StatusType)(statusByte & 0xF0))
-			{
-				case StatusType.SysEx1: // and 0xF7, 0xFF
-					switch ((StatusType)statusByte)
-					{
-						case StatusType.MtcQuarterFrame:
-						case StatusType.SongSelect:
-							return 1;
-						case StatusType.SongPositionPointer:
-							return 2;
-						default:
-							return 0; // no fixed data
-					}
-				case StatusType.Program:
-				case StatusType.CAf:
-					return 1;
-				default:
-					return 2;
 			}
 		}
 

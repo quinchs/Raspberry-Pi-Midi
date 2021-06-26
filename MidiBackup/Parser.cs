@@ -48,27 +48,41 @@ namespace MidiBackup
 				Value = value
 			};
 
-			switch (type)
+			if(type < 0xF0)
             {
-				case (byte)StatusType.NoteOff or (byte)StatusType.NoteOn:
-					return new NoteMessage(packet);
+				// removes the channel bit, idk if theres a better way to do this, (0xB5 >> 4 << 4 == 0xB0)
+				switch ((type >> 4) << 4)
+				{
+					case (byte)StatusType.NoteOff or (byte)StatusType.NoteOn:
+						return new NoteMessage(packet);
 
-				case 0xB0 or 0xB1:
-                    {
-                        switch ((CCType)arg1)
-                        {
-							case CCType.Hold:
-								return new SustainMessage(packet);
+					case (byte)(StatusType.Program):
+						return new ProgramMessage(packet);
 
-							default: return new DefaultMidiMessage(packet);
-                        }
-                    }
-				case 0xF0:
-					return new SystemExclusiveMessage(packet);
+					case (byte)StatusType.CC:
+						{
+							switch ((CCType)arg1)
+							{
+								case CCType.Hold:
+									return new SustainMessage(packet);
 
+								default: return new DefaultMidiMessage(packet);
+							}
+						}
+					default: return new DefaultMidiMessage(packet);
+				}
+			}
+            else
+            {
+                switch (type)
+                {
+					case 0xF0:
+						return new SystemExclusiveMessage(packet);
 
-				default: return new DefaultMidiMessage(packet);
+					default: return new DefaultMidiMessage(packet);
+				}
             }
+			
         }
 
 
