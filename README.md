@@ -1,6 +1,6 @@
 # Raspberry-Pi-Midi
 
-Welcome to the C# raspberry pi midi reader. This project was made because I had a pi and wanted to record my jam sessions on my piaggero np v60.
+Welcome to the C# raspberry pi midi reader. I dont know if this is technically a "driver" or not.. This project was made because I had a pi and wanted to record my jam sessions on my piaggero np v60.
 
 ## Features
 
