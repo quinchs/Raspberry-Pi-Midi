@@ -9,5 +9,7 @@ namespace MidiBackup
     public class Config
     {
         public bool Debug { get; set; }
+        public int Port { get; set; } = 69420;
+        public bool LazySustain { get; set; } = false;
     }
 }

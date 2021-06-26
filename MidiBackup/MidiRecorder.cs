@@ -16,11 +16,18 @@ namespace MidiBackup
 
         public bool IsRecording { get; private set; }
 
+        public TimeSpan Duration
+            => Events.LastOrDefault().time;
+
         private MidiFile File { get; set; }
 
         private List<(TimeSpan time, MidiEvent evnt)> Events { get; set; } = new List<(TimeSpan time, MidiEvent evnt)>();
 
+        private List<MidiEvent> LazySustainedEvents = new List<MidiEvent>();
+
         private readonly Stopwatch _stopwatch = new Stopwatch();
+
+        public bool SustainedOn { get; set; } = false;
 
         public MidiRecorder(MidiDriver driver)
         {
@@ -37,7 +44,17 @@ namespace MidiBackup
                 return;
 
             var sustain = new ControlChangeEvent((SevenBitNumber)0x40, (SevenBitNumber)arg.Value);
+            SustainedOn = arg.Value > 0;
+
             Events.Add((_stopwatch.Elapsed, sustain));
+
+            if (LazySustainedEvents.Any())
+            {
+                foreach(var item in LazySustainedEvents)
+                    Events.Add((_stopwatch.Elapsed, item));
+
+                LazySustainedEvents.Clear();
+            }
         }
 
         public async Task NoteReleased(MidiNoteEventArgs arg)
@@ -46,7 +63,17 @@ namespace MidiBackup
                 return;
 
             var note = new NoteOffEvent((SevenBitNumber)arg.Note, (SevenBitNumber)arg.Velocity);
-            Events.Add((_stopwatch.Elapsed, note));
+
+            if (!Driver.Config.LazySustain)
+            {
+                Events.Add((_stopwatch.Elapsed, note));
+            }
+            else
+            {
+                if (!SustainedOn)
+                    Events.Add((_stopwatch.Elapsed, note));
+                else LazySustainedEvents.Add(note);
+            }
         }
 
         public async Task NotePressed(MidiNoteEventArgs arg)
@@ -55,7 +82,12 @@ namespace MidiBackup
                 return;
 
             var note = new NoteOnEvent((SevenBitNumber)arg.Note, (SevenBitNumber)arg.Velocity);
-            Events.Add((_stopwatch.Elapsed, note));
+
+            var val = (_stopwatch.Elapsed, note);
+            Events.Add(val);
+
+            //if (SustainedOn && Driver.Config.LazySustain)
+            //    LazySustainedEvents.Add(val.note);
         }
 
         public void Start()
@@ -97,7 +129,7 @@ namespace MidiBackup
             }
             catch(Exception x)
             {
-                Console.WriteLine(x);
+                Logger.Write(x, Severity.Error);
             }
         }
     }

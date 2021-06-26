@@ -18,14 +18,19 @@ namespace MidiBackup
             this.Driver = driver;
         }
 
-        public async Task WritePacket(OutgoingMidiMessage message)
+        public async Task WritePacket(params byte[] buff)
         {
-            var buff = message.Build();
+            if (buff.Length == 0)
+                return;
 
-            Console.WriteLine($"Sending {buff.Length} bytes to midi device: {BitConverter.ToString(buff).Replace("-", "")}");
+            if (Driver.Config.Debug)
+                Logger.Write($"Sending {buff.Length} bytes to midi device: {BitConverter.ToString(buff).Replace("-", "")}", Severity.MIDI, Severity.Writer);
 
             await Stream.WriteAsync(buff);
             await Stream.FlushAsync();
         }
+
+        public Task WritePacket(OutgoingMidiMessage message)
+            => WritePacket(message.Build());
     }
 }

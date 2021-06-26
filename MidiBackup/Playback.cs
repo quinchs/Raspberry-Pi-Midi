@@ -11,10 +11,9 @@ using System.Threading.Tasks;
 
 namespace MidiBackup
 {
-    class Playback
+    public class Playback
     {
         public MidiFile CurrentFile { get; private set; }
-        private Melanchall.DryWetMidi.Devices.Playback MidiPlayback { get; set; }
         private TempoMap TempoMap;
         private List<TimedEvent> Events { get; set; } = new List<TimedEvent>();
         public bool IsPlaying { get; private set; }
@@ -24,7 +23,9 @@ namespace MidiBackup
 
         private TimeSpan Duration { get; set; }
 
-        private List<TimedEvent> AlreadyPlayedNotes { get; } = new List<TimedEvent>();
+        private MidiClock Clock { get; set; }
+
+        private MetricTimeSpan LastRead { get; set; } = TimeSpan.Zero;
 
         public Playback(MidiDriver driver)
         {
@@ -37,48 +38,91 @@ namespace MidiBackup
             if (!IsPlaying)
                 return;
 
-            if (stopwatch.Elapsed.Ticks > Duration.Ticks)
-                Stop();
-
-            var newEvents = Events.Where(x => x.TimeAs<MetricTimeSpan>(TempoMap) <= (MetricTimeSpan)stopwatch.Elapsed && !AlreadyPlayedNotes.Contains(x));
-
-            foreach (var item in newEvents)
+            try
             {
-                Console.WriteLine($"{item.Time} - {item.Event.EventType}");
-                Playback_EventPlayed(null, item);
-            }
+                if (stopwatch.Elapsed.Ticks > Duration.Ticks)
+                    Stop();
 
-            AlreadyPlayedNotes.AddRange(newEvents);
+                var ts = (MetricTimeSpan)stopwatch.Elapsed;
+                var newEvents = Events.Where(x =>
+                {
+                    var pTS = x.TimeAs<MetricTimeSpan>(TempoMap);
+                    return pTS.TotalMicroseconds <= ts.TotalMicroseconds && pTS.TotalMicroseconds > LastRead.TotalMicroseconds;
+                });
+
+                
+
+                var buff = BuildPacket(newEvents.Select(x => GetMessage(x)).ToArray());
+
+                if (Driver.Config.Debug)
+                {
+                    Logger.Write($"{LastRead} - {ts} : {newEvents.Count()}", Severity.MIDI, Severity.Log);
+                }
+
+                LastRead = ts;
+
+                if (buff.Length > 0)
+                {
+                    await Driver.Writer.WritePacket(buff);
+                    Logger.Write($"Sending 0x{string.Join("", buff.Select(x => x.ToString("X2")))}", Severity.MIDI);
+                }
+            }
+            catch(Exception x)
+            {
+                Logger.Write(x, Severity.MIDI, Severity.Error);
+            }
         }
 
         public void Start(string file)
         {
-            this.CurrentFile = MidiFile.Read(file);
+            try
+            {
+                this.CurrentFile = MidiFile.Read(file);
 
-            this.TempoMap = MidiPlayback?.TempoMap ?? TempoMap.Default;
+                this.TempoMap = CurrentFile.GetTempoMap() ?? TempoMap.Default;
 
-            Console.WriteLine($"Midi file opened: {CurrentFile} - {TempoMap}");
+                Logger.Write($"Midi file opened: {CurrentFile} - {TempoMap}", Severity.MIDI, Severity.Driver);
 
-            AlreadyPlayedNotes.Clear();
-            Events.Clear();
-            Events = CurrentFile.GetTimedEvents().ToList();
+                Events.Clear();
+                Events = CurrentFile.GetTimedEvents().ToList();
 
-            Duration = CurrentFile
-                .GetTimedEvents()
-                .LastOrDefault(e => e.Event is NoteOffEvent)
-                ?.TimeAs<MetricTimeSpan>(TempoMap) ?? new MetricTimeSpan();
+                LastRead = TimeSpan.Zero;
 
-            Console.WriteLine("Track length: " + Duration.TotalSeconds + "s");
-            IsPlaying = true;
-            stopwatch.Reset();
-            stopwatch.Start();
-            Console.WriteLine("Track started");
+                Clock = new MidiClock(20, Driver);
+
+                Duration = CurrentFile
+                    .GetTimedEvents()
+                    .LastOrDefault(e => e.Event is NoteOffEvent)
+                    ?.TimeAs<MetricTimeSpan>(TempoMap) ?? new MetricTimeSpan();
+
+                Logger.Write("Track length: " + Duration.TotalSeconds + "s", Severity.MIDI, Severity.Driver);
+
+                Clock.Start();
+                IsPlaying = true;
+                stopwatch.Reset();
+                stopwatch.Start();
+                Logger.Write("Track started", Severity.MIDI, Severity.Driver);
+            }
+            catch(Exception x)
+            {
+                Logger.Write(x, Severity.Error);
+            }
         }
 
-        private async void Playback_EventPlayed(object sender, TimedEvent e)
+        private byte[] BuildPacket(params OutgoingMidiMessage[] msg)
+        {
+            List<byte> buff = new List<byte>();
+
+            foreach (var item in msg)
+                buff.AddRange(item.Build());
+
+            return buff.ToArray();
+        }
+
+        private OutgoingMidiMessage GetMessage(TimedEvent e)
         {
             if (!IsPlaying)
-                return;
+                return null;
 
             try
             {
@@ -87,38 +131,40 @@ namespace MidiBackup
                     case MidiEventType.NoteOn:
                         {
                             var message = (NoteOnEvent)e.Event;
-                            await Driver.Writer.WritePacket(new NoteOn(message.Channel, message.NoteNumber, message.Velocity));
+                            return new NoteOn(message.Channel, message.NoteNumber, message.Velocity);
                         }
-                        break;
                     case MidiEventType.NoteOff:
                         {
                             var message = (NoteOffEvent)e.Event;
-                            await Driver.Writer.WritePacket(new NoteOff(message.Channel, message.NoteNumber));
+                            return new NoteOff(message.Channel, message.NoteNumber);
                         }
-                        break;
                     case MidiEventType.ControlChange:
                         {
                             var controlChange = (ControlChangeEvent)e.Event;
-                            await Driver.Writer.WritePacket(new CCMessage(controlChange.Channel, (CCType)(byte)controlChange.ControlNumber, controlChange.ControlValue));
+                            return new CCMessage(controlChange.Channel, (CCType)(byte)controlChange.ControlNumber, controlChange.ControlValue);
                         }
-                        break;
                 }
             }
             catch(Exception x)
             {
-                Console.WriteLine(x);
+                Logger.Write(Logger.BuildColoredString($"{x}", ConsoleColor.Red), Severity.Error);
             }
+
+            return null;
         }
 
         public void Stop()
         {
-            Console.WriteLine("Track ended");
-            IsPlaying = false;
-            CurrentFile = null;
-            stopwatch.Stop();
-            MidiPlayback.Stop();
-            MidiPlayback = null;
-            Duration = TimeSpan.Zero;
+            if (IsPlaying)
+            {
+                Logger.Write("Track ended", Severity.MIDI, Severity.Driver);
+                IsPlaying = false;
+                Clock.Stop();
+                CurrentFile = null;
+                stopwatch.Stop();
+                Duration = TimeSpan.Zero;
+                LastRead = TimeSpan.Zero;
+            }
         }
     }
 }

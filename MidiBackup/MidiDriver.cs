@@ -12,6 +12,8 @@ namespace MidiBackup
 {
     public partial class MidiDriver
     {
+        public MidiRecorder Recorder { get; private set; }
+        public Playback Playback { get; private set; }
         public Reader Reader { get; private set; }
         public Writer Writer { get; private set; }
 
@@ -41,6 +43,9 @@ namespace MidiBackup
 
             Watcher.EnableRaisingEvents = true;
             Watcher.IncludeSubdirectories = true;
+
+            Playback = new Playback(this);
+            Recorder = new MidiRecorder(this);
         }
 
         public async Task Start()
@@ -50,7 +55,7 @@ namespace MidiBackup
 
             if (MidiFile != null)
             {
-                Console.WriteLine($"Found connected midi device: {MidiFile}");
+                Logger.Write($"Found connected midi device: {MidiFile}", Severity.Driver, Severity.Log);
 
                 OpenMidiStream(MidiFile);
                 if (Reader == null)
@@ -63,7 +68,7 @@ namespace MidiBackup
             }
             else
             {
-                Console.WriteLine("Waiting for midi device...");
+                Logger.Write("Waiting for midi device...", Severity.Driver, Severity.Log);
             }
         }
 
@@ -71,7 +76,6 @@ namespace MidiBackup
         {
             try
             {
-                Console.WriteLine($"D {e.FullPath}");
                 if (e.Name.StartsWith("midi"))
                 {
                     if (MidiStream != null)
@@ -80,32 +84,33 @@ namespace MidiBackup
             }
             catch (Exception x)
             {
-                Console.WriteLine(x);
+                Logger.Write(x, Severity.Driver, Severity.Log);
             }
         }
 
         public void HandleDeviceDisconnected()
         {
-            Console.WriteLine("Midi device disconnected, pausing read");
             if (MidiStream != null)
             {
+                Logger.Write("Midi device disconnected, pausing read", Severity.Driver, Severity.Log);
                 MidiStream.Dispose();
                 MidiStream.Close();
                 MidiStream = null;
-            }
-            PauseRead();
 
-            DispatchEvent(DeviceDisconnected);
+                PauseRead();
+
+                DispatchEvent(DeviceDisconnected);
+            }
+
         }
 
         private void Watcher_Created(object sender, FileSystemEventArgs e)
         {
             try
             {
-                Console.WriteLine($"C {e.FullPath}");
                 if (e.Name.StartsWith("midi"))
                 {
-                    Console.WriteLine("Midi stream was created, opening...");
+                    Logger.Write("Midi stream was created, opening...", Severity.Driver, Severity.Log);
                     Thread.Sleep(500);
                     OpenMidiStream(e.FullPath);
                     if (Reader == null)
@@ -119,7 +124,7 @@ namespace MidiBackup
             }
             catch (Exception x)
             {
-                Console.WriteLine(x);
+                Logger.Write(x, Severity.Driver, Severity.Error);
             }
         }
 

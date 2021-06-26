@@ -1,4 +1,5 @@
 ﻿using Commons.Music.Midi;
+using MidiBackup.Http;
 using MidiBackup.Outgoing;
 using Newtonsoft.Json;
 using System;
@@ -14,11 +15,13 @@ namespace MidiBackup
     {
         public string MidiDir = $"{Environment.CurrentDirectory}{Path.DirectorySeparatorChar}MidiFiles";
         public MidiDriver Driver;
-        public MidiRecorder Recorder;
-        public Playback Playback;
+
+        public HttpServer Server;
+
         public static Config Config { get; private set; }
         static void Main(string[] args)
         {
+            Logger.Create();
             new Program().Start(args).GetAwaiter().GetResult();
         }
 
@@ -49,92 +52,98 @@ namespace MidiBackup
 
         public async Task Start(string[] args)
         {
-            var confFile = Environment.CurrentDirectory + $"{Path.DirectorySeparatorChar}conf.json";
-
-            if (!File.Exists(confFile)) File.Create(confFile).Close();
-
             try
             {
-                var json = File.ReadAllText(confFile);
-                Config = JsonConvert.DeserializeObject<Config>(json);
-            }
-            catch (Newtonsoft.Json.JsonException x)
-            {
-                Console.Error.WriteLine($"Failed to read config file: {x}");
+                var confFile = Environment.CurrentDirectory + $"{Path.DirectorySeparatorChar}conf.json";
+
+                if (!File.Exists(confFile)) File.Create(confFile).Close();
+
+                try
+                {
+                    var json = File.ReadAllText(confFile);
+                    Config = JsonConvert.DeserializeObject<Config>(json);
+                }
+                catch (Newtonsoft.Json.JsonException x)
+                {
+                    Logger.Write($"Failed to read config file: {x}", Severity.Error);
+                }
+                catch (Exception x)
+                {
+                    Logger.Write($"Failed to load config: {x}", Severity.Error);
+                }
+
+                
+                Driver = new MidiDriver(Config);
+                Server = new HttpServer(Config.Port, Driver);
+                await Driver.Start();
+
+                if (args.Length == 2 && args[0] == "-p")
+                {
+                    DoPlayback(args[1]);
+                    await Task.Delay(-1);
+                }
+
+                StopperTimer.Elapsed += HandleElapsed;
+
+                Driver.OnMessage += Driver_OnMessage;
+
+                async Task CheckRec(object arg)
+                {
+                    if (!Driver.Recorder.IsRecording)
+                    {
+                        StartRecording();
+
+                        if (arg is MidiNoteEventArgs pArg)
+                        {
+                            await Driver.Recorder.NotePressed(pArg);
+                        }
+                        else if (arg is MidiSustainEventArg sus)
+                        {
+                            await Driver.Recorder.OnSustain(sus);
+                        }
+                    }
+                    else
+                    {
+                        StopperTimer.Stop();
+                        StopperTimer.Interval = 60000;
+                        StopperTimer.Start();
+                    }
+                }
+
+                Driver.OnNotePressed += CheckRec;
+                Driver.OnSustain += CheckRec;
+
+                Driver.DeviceDisconnected += async () =>
+                {
+                    Logger.Write("Device disconnected", Severity.Driver, Severity.Log);
+                    if (Driver.Recorder.IsRecording)
+                        SaveRecording();
+                };
+
+                await Task.Delay(-1);
             }
             catch (Exception x)
             {
-                Console.Error.WriteLine($"Failed to load config: {x}");
+                Logger.Write(x, Severity.Critical);
             }
-
-            Driver = new MidiDriver(Config);
-            Playback = new Playback(Driver);
-            await Driver.Start();
-
-            if (args.Length == 2 && args[0] == "-p")
-            {
-                DoPlayback(args[1]);
-                await Task.Delay(-1);
-            }
-
-            Recorder = new MidiRecorder(Driver);
-
-            StopperTimer.Elapsed += HandleElapsed;
-
-            Driver.OnMessage += Driver_OnMessage;
-
-            async Task CheckRec(object arg)
-            {
-                if (!Recorder.IsRecording)
-                {
-                    StartRecording();
-
-                    if(arg is MidiNoteEventArgs pArg)
-                    {
-                        await Recorder.NotePressed(pArg);
-                    }
-                    else if (arg is MidiSustainEventArg sus)
-                    {
-                        await Recorder.OnSustain(sus);
-                    }
-                }
-                else
-                {
-                    StopperTimer.Stop();
-                    StopperTimer.Interval = 60000;
-                    StopperTimer.Start();
-                }
-            }
-
-            Driver.OnNotePressed += CheckRec;
-            Driver.OnSustain += CheckRec;
-
-            Driver.DeviceDisconnected += async () =>
-            {
-                Console.WriteLine("Device disconnected");
-                if (Recorder.IsRecording)
-                    SaveRecording();
-            };
-
-            await Task.Delay(-1);
         }
 
         private void DoPlayback(string file)
         {
-            Playback.Start(file);
+            Driver.Playback.Start(file);
         }
 
         private void HandleElapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            if (Recorder.IsRecording)
+            if (Driver.Recorder.IsRecording)
                 SaveRecording();
         }
 
         System.Timers.Timer StopperTimer = new System.Timers.Timer(60000); 
         public void StartRecording()
         {
-            Console.WriteLine("Recording started");
-            Recorder.Start();
+            Logger.Write("Recording started", Severity.MIDI, Severity.Log);
+            Driver.Recorder.Start();
         }
 
         public void SaveRecording()
@@ -142,25 +151,25 @@ namespace MidiBackup
             if (!Directory.Exists(MidiDir))
                 Directory.CreateDirectory(MidiDir);
 
-            var fileName = $"{MidiDir}{Path.DirectorySeparatorChar}{ DateTime.UtcNow.ToString("O")}.midi";
+            var fileName = $"{MidiDir}{Path.DirectorySeparatorChar}{ DateTime.UtcNow.ToString("O")}_{Driver.Recorder.Duration.TotalSeconds}.midi";
 
-            Recorder.Stop();
+            Driver.Recorder.Stop();
             try
             {
-                Recorder.Save(fileName);
+                Driver.Recorder.Save(fileName);
             }
             catch(Exception x)
             {
-                Console.WriteLine(x);
+                Logger.Write(x, Severity.MIDI, Severity.Error);
             }
 
-            Console.WriteLine($"Saved recording to {fileName}");
+            Logger.Write($"Saved recording to {fileName}", Severity.MIDI, Severity.Log);
         }
 
         private Task Driver_OnMessage(MidiEventArgs arg)
         {
             if(arg.Message.Status != StatusType.MidiClock && arg.Message.Status != StatusType.ActiveSense)
-                Console.WriteLine($"{arg.Message}");
+                Logger.Write($"{arg.Message}", Severity.Driver, Severity.Log);
 
             return Task.CompletedTask;
         }

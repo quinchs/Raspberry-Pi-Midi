@@ -73,7 +73,7 @@ namespace MidiBackup
                 else
                     DispatchEvent(OnNoteReleased, arg);
             }
-            else if (Message is SustainMessage sustain)
+            else if (Message is SustainMessage sustain && sustain.Channel == 0)
             {
                 var arg = new MidiSustainEventArg(sustain);
                 DispatchEvent(OnSustain, arg);
@@ -93,7 +93,7 @@ namespace MidiBackup
 
                 if (task.Exception != null)
                 {
-                    Console.WriteLine($"Exception in event listener: {task.Exception}");
+                    Logger.Write($"Exception in event listener: {task.Exception}", Severity.Driver, Severity.Error);
                 }
             });
         }
@@ -110,7 +110,7 @@ namespace MidiBackup
 
                 if (task.Exception != null)
                 {
-                    Console.WriteLine($"Exception in event listener: {task.Exception}");
+                    Logger.Write($"Exception in event listener: {task.Exception}", Severity.Driver, Severity.Error);
                 }
             });
         }
@@ -128,7 +128,7 @@ namespace MidiBackup
 
                 if (task.Exception != null)
                 {
-                    Console.WriteLine($"Exception in event listener: {task.Exception}");
+                    Logger.Write($"Exception in event listener: {task.Exception}", Severity.Driver, Severity.Error);
                 }
             });
         }
