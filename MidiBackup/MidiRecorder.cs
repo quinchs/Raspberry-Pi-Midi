@@ -12,6 +12,9 @@ namespace MidiBackup
 {
     public class MidiRecorder
     {
+        public event Func<Task> RecordingStarted;
+        public event Func<Task> RecordingStopped;
+
         public MidiDriver Driver { get; }
 
         public bool IsRecording { get; private set; }
@@ -95,6 +98,8 @@ namespace MidiBackup
             Reset();
             IsRecording = true;
             _stopwatch.Start();
+
+            Driver.DispatchEvent(RecordingStarted);
         }
 
         public void Reset()
@@ -107,6 +112,7 @@ namespace MidiBackup
         public void Stop()
         {
             IsRecording = false;
+            Driver.DispatchEvent(RecordingStopped);
         }
 
         public void Save(string path)

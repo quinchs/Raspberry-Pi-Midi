@@ -17,7 +17,8 @@ namespace MidiBackup
         Reader,
         Writer,
         Driver,
-        Critical
+        Critical,
+        Websocket
     }
     public class Logger
     {
@@ -149,9 +150,12 @@ namespace MidiBackup
             { Severity.Driver, ConsoleColor.Cyan },
             { Severity.MIDI, ConsoleColor.Magenta },
             { Severity.Reader, ConsoleColor.DarkGreen },
-            { Severity.Writer, ConsoleColor.DarkBlue }
+            { Severity.Writer, ConsoleColor.DarkBlue },
+            { Severity.Websocket, ConsoleColor.Gray },
         };
 
+        public static string BuildColoredString(object s, ConsoleColor color)
+            => BuildColoredString(s.ToString(), color);
         public static string BuildColoredString(string s, ConsoleColor color)
         {
             return $"<{color}>{s}</{color}>";

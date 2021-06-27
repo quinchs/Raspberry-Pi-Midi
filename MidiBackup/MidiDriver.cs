@@ -17,6 +17,8 @@ namespace MidiBackup
         public Reader Reader { get; private set; }
         public Writer Writer { get; private set; }
 
+        public string DeviceName { get; private set; }
+
         private FileSystemWatcher Watcher { get; }
 
         internal FileStream MidiStream { get; private set; }
@@ -62,9 +64,10 @@ namespace MidiBackup
                     Reader = new Reader(this);
                 if (Writer == null)
                     Writer = new Writer(this);
+                DeviceName = $"{MidiFile.Split("/").Last()}";
                 ResumeRead();
 
-                //await Writer.WritePacket(new SetInstrument<Instrument>(0, Instrument.AcousticGrandPiano));
+                DispatchEvent(DeviceConnected);
             }
             else
             {
@@ -96,6 +99,7 @@ namespace MidiBackup
                 MidiStream.Dispose();
                 MidiStream.Close();
                 MidiStream = null;
+                DeviceName = null;
 
                 PauseRead();
 
@@ -118,6 +122,7 @@ namespace MidiBackup
                     if (Writer == null)
                         Writer = new Writer(this);
 
+                    DeviceName = $"{e.Name}";
                     ResumeRead();
                     DispatchEvent(DeviceConnected);
                 }

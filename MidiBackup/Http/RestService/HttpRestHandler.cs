@@ -65,7 +65,7 @@ namespace MidiBackup.Http.RestService
 
         private void BumpOrEnqueueModule(RestModuleBase baseModule)
         {
-            if (CachedModules.Any(x => x.Equals(baseModule)))
+            if (CachedModules.ToArray().Any(x => x.Equals(baseModule)))
             {
                 CachedModules.Remove(baseModule);
                 

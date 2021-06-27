@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Net.WebSockets;
 using MidiBackup.Http.RestService;
 using System.Diagnostics;
+using MidiBackup.Http.Websocket;
 
 namespace MidiBackup.Http
 {
@@ -14,6 +15,7 @@ namespace MidiBackup.Http
     {
         private HttpListener _listener;
         private HttpRestHandler _handler;
+        internal WebsocketServer _websocketServer;
 
         internal MidiDriver Driver;
         
@@ -31,6 +33,7 @@ namespace MidiBackup.Http
 
             _handler = new(this);
 
+            _websocketServer = new WebsocketServer(this);
 
             _listener.Start();
 

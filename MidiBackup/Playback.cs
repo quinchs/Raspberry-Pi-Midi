@@ -8,29 +8,60 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Timers;
 
 namespace MidiBackup
 {
     public class Playback
     {
+        public event Func<string, Task> PlaybackStarted;
+        public event Func<Task> PlaybackStopped;
+        public event Func<long, long, Task> MidiTimeUpdated;
+
         public MidiFile CurrentFile { get; private set; }
+        public string CurrentFileName { get; private set; }
+
         private TempoMap TempoMap;
         private List<TimedEvent> Events { get; set; } = new List<TimedEvent>();
         public bool IsPlaying { get; private set; }
         private Stopwatch stopwatch { get; set; } = new Stopwatch();
+        private TimeSpan StartOffset { get; set; } = TimeSpan.Zero;
 
         private MidiDriver Driver { get; }
 
-        private TimeSpan Duration { get; set; }
+        public TimeSpan Duration { get; private set; }
 
         private MidiClock Clock { get; set; }
 
         private MetricTimeSpan LastRead { get; set; } = TimeSpan.Zero;
 
+        private Timer PlaybackEventTimer { get;}
+        public bool IsPaused { get; private set; } = false;
+
         public Playback(MidiDriver driver)
         {
             this.Driver = driver;
             this.Driver.OnMidiClock += Driver_OnMidiClock;
+            PlaybackEventTimer = new Timer(driver.Config.PlaybackDispatchTime);
+            PlaybackEventTimer.Elapsed += PlaybackEventTimer_Elapsed;
+            PlaybackEventTimer.Start();
+        }
+
+        private long lastSecond = 0;
+
+        private void PlaybackEventTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            if (!IsPlaying)
+                return;
+
+            var currentSecond = (long)(stopwatch.Elapsed + StartOffset).TotalSeconds;
+
+            if (lastSecond == currentSecond)
+                return;
+
+            lastSecond = currentSecond;
+
+            Driver.DispatchEvent(MidiTimeUpdated, currentSecond, (long)Duration.TotalSeconds);
         }
 
         private async Task Driver_OnMidiClock()
@@ -40,10 +71,11 @@ namespace MidiBackup
 
             try
             {
-                if (stopwatch.Elapsed.Ticks > Duration.Ticks)
+                var tickTime = StartOffset + stopwatch.Elapsed;
+                if (tickTime.Ticks > Duration.Ticks)
                     Stop();
 
-                var ts = (MetricTimeSpan)stopwatch.Elapsed;
+                var ts = (MetricTimeSpan)tickTime;
                 var newEvents = Events.Where(x =>
                 {
                     var pTS = x.TimeAs<MetricTimeSpan>(TempoMap);
@@ -73,11 +105,24 @@ namespace MidiBackup
             }
         }
 
+        public bool Seek(long miliseconds)
+        {
+            var offset = TimeSpan.FromMilliseconds(miliseconds);
+
+            if (offset.TotalMilliseconds >= Duration.TotalMilliseconds)
+                return false;
+
+            StartOffset = offset;
+            stopwatch.Restart();
+            return true;
+        }
+
         public void Start(string file)
         {
             try
             {
                 this.CurrentFile = MidiFile.Read(file);
+                this.CurrentFileName = file;
 
                 this.TempoMap = CurrentFile.GetTempoMap() ?? TempoMap.Default;
 
@@ -99,13 +144,19 @@ namespace MidiBackup
 
                 Clock.Start();
                 IsPlaying = true;
+                StartOffset = TimeSpan.Zero;
                 stopwatch.Reset();
                 stopwatch.Start();
+                lastSecond = 0;
+                IsPaused = true;
                 Logger.Write("Track started", Severity.MIDI, Severity.Driver);
+
+                Driver.DispatchEvent(PlaybackStarted, file);
             }
             catch(Exception x)
             {
                 Logger.Write(x, Severity.Error);
+                Stop();
             }
         }
 
@@ -159,12 +210,29 @@ namespace MidiBackup
             {
                 Logger.Write("Track ended", Severity.MIDI, Severity.Driver);
                 IsPlaying = false;
+                this.CurrentFileName = null;
                 Clock.Stop();
                 CurrentFile = null;
                 stopwatch.Stop();
+                lastSecond = 0;
                 Duration = TimeSpan.Zero;
                 LastRead = TimeSpan.Zero;
+                IsPaused = false;
+
+                Driver.DispatchEvent(PlaybackStopped);
             }
+        }
+
+        public void Pause()
+        {
+            stopwatch.Stop();
+            IsPaused = true;
+        }
+
+        public void Resume()
+        {
+            stopwatch.Start();
+            IsPaused = false;
         }
     }
 }

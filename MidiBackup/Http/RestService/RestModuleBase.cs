@@ -6,7 +6,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MidiBackup.Http.RestService
+namespace MidiBackup.Http
 {
     public class RestModuleBase
     {
@@ -29,6 +29,9 @@ namespace MidiBackup.Http.RestService
 
         public Playback Playback
             => Driver.Playback;
+
+        public Task AcceptWebsocketAsync()
+            => RestServer._websocketServer.AcceptWebsocketRequestAsync(this.Context);
 
         internal RestModuleBase InitializeModule(HttpListenerContext context, RestModuleInfo info, HttpServer server)
         {

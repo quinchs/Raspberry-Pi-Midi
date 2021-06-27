@@ -80,32 +80,33 @@ namespace MidiBackup
             }
         }
 
-        private void DispatchEvent(Func<Task> func)
+        internal void DispatchEvent(Func<Task> func)
         {
-            _ = Task.Run(async () =>
-            {
-                var task = func?.Invoke();
-
-                if (task == null)
-                    return;
-
-                await task;
-
-                if (task.Exception != null)
-                {
-                    Logger.Write($"Exception in event listener: {task.Exception}", Severity.Driver, Severity.Error);
-                }
-            });
+            var task = func?.Invoke();
+            if (task == null)
+                return;
+            DispatchEventInternal(task);
         }
-        private void DispatchEvent<TIn>(Func<TIn, Task> func, TIn val)
+        internal void DispatchEvent<TIn>(Func<TIn, Task> func, TIn val)
+        {
+            var task = func?.Invoke(val);
+            if (task == null)
+                return;
+            DispatchEventInternal(task);
+        }
+
+        internal void DispatchEvent<TIn1, TIn2>(Func<TIn1, TIn2, Task> func, TIn1 val1, TIn2 val2)
+        {
+            var task = func?.Invoke(val1, val2);
+            if (task == null)
+                return;
+            DispatchEventInternal(task);
+        }
+
+        private void DispatchEventInternal(Task task)
         {
             _ = Task.Run(async () =>
             {
-                var task = func?.Invoke(val);
-
-                if (task == null)
-                    return;
-
                 await task;
 
                 if (task.Exception != null)
