@@ -30,7 +30,19 @@ namespace MidiBackup.Http.RestService.Info
         }
 
         public bool HasRoute(HttpListenerRequest request)
-            => Routes.Any(x => x.IsMatch(request.RawUrl, request.HttpMethod));
+            => Routes.Any(x =>
+            {
+                Logger.Write($"{x == null} {x}", Severity.Http, Severity.Log);
+                try
+                {
+                    return x.IsMatch(request.RawUrl, request.HttpMethod);
+                }
+                catch(Exception ex)
+                {
+                    Logger.Write($"{ex}", Severity.Http, Severity.Critical);
+                    return false;
+                }
+            });
 
         public RestMethodInfo GetRoute(HttpListenerRequest request)
             => Routes.FirstOrDefault(x => x.IsMatch(request.RawUrl, request.HttpMethod));
@@ -45,6 +57,11 @@ namespace MidiBackup.Http.RestService.Info
                 return this.classType == other.classType;
             }
             else return base.Equals(obj);
+        }
+
+        public override string ToString()
+        {
+            return classType.Name;
         }
     }
 }

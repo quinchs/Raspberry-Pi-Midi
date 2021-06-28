@@ -58,11 +58,11 @@ namespace MidiBackup.Http
             {
                 var code = await _handler.ProcessRestRequestAsync(context);
                 sw.Stop();
-                Logger.Write($"{sw.ElapsedMilliseconds}ms: {GetColorFromMethod(context.Request.HttpMethod)} => {context.Request.RawUrl} {code}");
+                Logger.Write($"{sw.ElapsedMilliseconds}ms: {GetColorFromMethod(context.Request.HttpMethod)} => {context.Request.RawUrl} {code}", Severity.Http, Severity.Log) ;
             }
             catch (Exception x)
             {
-                Logger.Write($"Uncaught exception in hanler: {x}", Severity.Http, Severity.Critical);
+                Logger.Write($"Uncaught exception in handler: {x}", Severity.Http, Severity.Critical);
             }
         }
 

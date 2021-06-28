@@ -20,24 +20,19 @@ namespace MidiBackup
 
         public MidiFile CurrentFile { get; private set; }
         public string CurrentFileName { get; private set; }
+        public MetricTimeSpan Duration { get; private set; }
+        public bool IsPlaying { get; private set; }
+        public bool IsPaused { get; private set; } = false;
 
         private TempoMap TempoMap;
         private List<TimedEvent> Events { get; set; } = new List<TimedEvent>();
-        public bool IsPlaying { get; private set; }
-        private Stopwatch stopwatch { get; set; } = new Stopwatch();
-        private TimeSpan StartOffset { get; set; } = TimeSpan.Zero;
-
+        private MidiStopwatch stopwatch { get; set; } = new MidiStopwatch();
+        private MetricTimeSpan StartOffset { get; set; } = TimeSpan.Zero;
         private MidiDriver Driver { get; }
-
-        public TimeSpan Duration { get; private set; }
-
         private MidiClock Clock { get; set; }
-
         private MetricTimeSpan LastRead { get; set; } = TimeSpan.Zero;
-
         private Timer PlaybackEventTimer { get;}
-        public bool IsPaused { get; private set; } = false;
-
+        
         public Playback(MidiDriver driver)
         {
             this.Driver = driver;
@@ -54,66 +49,87 @@ namespace MidiBackup
             if (!IsPlaying)
                 return;
 
-            var currentSecond = (long)(stopwatch.Elapsed + StartOffset).TotalSeconds;
+            var currentSecond = (long)(stopwatch.Elapsed + StartOffset).Seconds;
 
             if (lastSecond == currentSecond)
                 return;
 
             lastSecond = currentSecond;
 
-            Driver.DispatchEvent(MidiTimeUpdated, currentSecond, (long)Duration.TotalSeconds);
+            Driver.DispatchEvent(MidiTimeUpdated, currentSecond, (long)((TimeSpan)Duration).TotalSeconds);
         }
 
         private async Task Driver_OnMidiClock()
         {
-            if (!IsPlaying)
+            if (!IsPlaying || IsPaused)
                 return;
 
             try
             {
-                var tickTime = StartOffset + stopwatch.Elapsed;
-                if (tickTime.Ticks > Duration.Ticks)
+                var ts = stopwatch.Elapsed + (MetricTimeSpan)StartOffset;
+                if (ts.TotalMicroseconds > Duration.TotalMicroseconds)
                     Stop();
 
-                var ts = (MetricTimeSpan)tickTime;
+                var last = ts.Milliseconds - LastRead.Milliseconds;
+
+                if (last < 0)
+                    last *= -1;
+
+                if (last > 60)
+                {
+                    if (ts.TotalMicroseconds <= 60000)
+                        LastRead = new MetricTimeSpan(0);
+                    else
+                        LastRead = ts - new MetricTimeSpan(60000);
+                }
+
                 var newEvents = Events.Where(x =>
                 {
                     var pTS = x.TimeAs<MetricTimeSpan>(TempoMap);
+                    if (pTS.TotalMicroseconds <= ts.TotalMicroseconds && pTS.TotalMicroseconds > LastRead.TotalMicroseconds && Driver.Config.Debug)
+                        Logger.Write($"Got event {x.Event.EventType} -- {pTS.TotalMicroseconds} <= {ts.TotalMicroseconds} && {pTS.TotalMicroseconds} > {LastRead.TotalMicroseconds}", Severity.MIDI, Severity.Log);
                     return pTS.TotalMicroseconds <= ts.TotalMicroseconds && pTS.TotalMicroseconds > LastRead.TotalMicroseconds;
-                });
+                }).ToArray();
 
-                
+                var tmpLast = LastRead;
+                LastRead = ts;
 
                 var buff = BuildPacket(newEvents.Select(x => GetMessage(x)).ToArray());
 
                 if (Driver.Config.Debug)
                 {
-                    Logger.Write($"{LastRead} - {ts} : {newEvents.Count()}", Severity.MIDI, Severity.Log);
+                    Logger.Write($"{tmpLast.TotalMicroseconds} - {ts.TotalMicroseconds} : {newEvents.Count()}", Severity.MIDI, Severity.Log);
                 }
-
-                LastRead = ts;
-
-                if (buff.Length > 0)
+                
+                if (buff != null && buff.Length > 0)
                 {
+                    if (!IsPlaying || IsPaused)
+                        return;
                     await Driver.Writer.WritePacket(buff);
-                    Logger.Write($"Sending 0x{string.Join("", buff.Select(x => x.ToString("X2")))}", Severity.MIDI);
+                    Logger.Write($"[{tmpLast.TotalMicroseconds} - {ts.TotalMicroseconds}] Sending 0x{string.Join("", buff.Select(x => x.ToString("X2")))}", Severity.MIDI);
                 }
             }
             catch(Exception x)
             {
-                Logger.Write(x, Severity.MIDI, Severity.Error);
+                Logger.Write(x, Severity.MIDI, Severity.Warning);
             }
         }
 
         public bool Seek(long miliseconds)
         {
-            var offset = TimeSpan.FromMilliseconds(miliseconds);
+            MetricTimeSpan offset = TimeSpan.FromMilliseconds(miliseconds);
 
-            if (offset.TotalMilliseconds >= Duration.TotalMilliseconds)
+            if (offset.TotalMicroseconds >= Duration.TotalMicroseconds)
                 return false;
-
+            this.Driver.OnMidiClock -= Driver_OnMidiClock;
+            IsPlaying = false;
+            stopwatch = MidiStopwatch.StartNew();
+            LastRead = offset;
             StartOffset = offset;
-            stopwatch.Restart();
+            IsPlaying = true;
+            lastSecond = (long)((TimeSpan)StartOffset).TotalSeconds - 1;
+            this.Driver.OnMidiClock += Driver_OnMidiClock;
+            Logger.Write($"Seeked to {miliseconds}", Severity.MIDI);
             return true;
         }
 
@@ -131,6 +147,9 @@ namespace MidiBackup
                 Events.Clear();
                 Events = CurrentFile.GetTimedEvents().ToList();
 
+                if(Driver.Config.Debug)
+                    Logger.Write($"{string.Join("\n", Events.Select(x => $"{x.Time} - {x.Event.EventType}"))}");
+
                 LastRead = TimeSpan.Zero;
 
                 Clock = new MidiClock(20, Driver);
@@ -140,15 +159,15 @@ namespace MidiBackup
                     .LastOrDefault(e => e.Event is NoteOffEvent)
                     ?.TimeAs<MetricTimeSpan>(TempoMap) ?? new MetricTimeSpan();
 
-                Logger.Write("Track length: " + Duration.TotalSeconds + "s", Severity.MIDI, Severity.Driver);
+                Logger.Write("Track length: " + ((TimeSpan)Duration).TotalSeconds + "s", Severity.MIDI, Severity.Driver);
 
                 Clock.Start();
-                IsPlaying = true;
                 StartOffset = TimeSpan.Zero;
                 stopwatch.Reset();
                 stopwatch.Start();
                 lastSecond = 0;
-                IsPaused = true;
+                IsPaused = false;
+                IsPlaying = true;
                 Logger.Write("Track started", Severity.MIDI, Severity.Driver);
 
                 Driver.DispatchEvent(PlaybackStarted, file);
@@ -162,6 +181,9 @@ namespace MidiBackup
 
         private byte[] BuildPacket(params OutgoingMidiMessage[] msg)
         {
+            if (msg.Length == 0)
+                return null;
+
             List<byte> buff = new List<byte>();
 
             foreach (var item in msg)
@@ -208,8 +230,8 @@ namespace MidiBackup
         {
             if (IsPlaying)
             {
-                Logger.Write("Track ended", Severity.MIDI, Severity.Driver);
                 IsPlaying = false;
+                Logger.Write("Track ended", Severity.MIDI, Severity.Driver);
                 this.CurrentFileName = null;
                 Clock.Stop();
                 CurrentFile = null;
@@ -218,6 +240,12 @@ namespace MidiBackup
                 Duration = TimeSpan.Zero;
                 LastRead = TimeSpan.Zero;
                 IsPaused = false;
+
+                _ = Task.Run(async () =>
+                {
+                    await Driver.Writer.WritePacket((byte)StatusType.CC, (byte)CCType.AllNotesOff, 0x00);
+                    await Driver.Writer.WritePacket((byte)StatusType.CC, (byte)CCType.AllSoundOff, 0x00);
+                });
 
                 Driver.DispatchEvent(PlaybackStopped);
             }

@@ -42,7 +42,7 @@ namespace MidiBackup
 
                     foreach (var ev in mEv)
                     {
-                        if (Driver.Config.Debug)
+                        if (Driver.Config.Debug && ev.Status != StatusType.MidiClock && ev.Status != StatusType.ActiveSense)
                             Logger.Write($"{mEv.Count()} - {BitConverter.ToString(buff.Take(l).ToArray()).Replace("-", "")}\nRead {l}/{buff.Length} : {ev}\n", Severity.Driver, Severity.Reader);
                         Driver.DispatchMessageEvent(ev);
                     }

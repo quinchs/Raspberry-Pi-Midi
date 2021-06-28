@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MidiBackup.Http.Routes
 {
-    class WebsocketRoute : RestModuleBase
+    public class WebsocketRoute : RestModuleBase
     {
         [Route("/socket", "GET")]
         public async Task<RestResult> GetSocket()

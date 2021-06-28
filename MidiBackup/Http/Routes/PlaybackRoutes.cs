@@ -13,7 +13,6 @@ namespace MidiBackup.Http.Routes
         [Route("/midi/play/{file}", "GET")]
         public async Task<RestResult> PlayFile(string file)
         {
-            Console.WriteLine(file + $"\n{Environment.CurrentDirectory}{Path.DirectorySeparatorChar}MidiFiles{Path.DirectorySeparatorChar}{file}");
             if (!File.Exists($"{Environment.CurrentDirectory}{Path.DirectorySeparatorChar}MidiFiles{Path.DirectorySeparatorChar}{file}"))
                 return RestResult.NotFound;
 

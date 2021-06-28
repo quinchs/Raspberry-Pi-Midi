@@ -42,22 +42,25 @@ namespace MidiBackup.Http.RestService
             Module = null;
             Info = null;
 
-            lock (CachedModules)
+            if ((Module = CachedModules.ToArray().FirstOrDefault(x => x != null &&  x.ModuleInfo.HasRoute(request))) != null)
             {
-                if((Module = CachedModules.FirstOrDefault(x => x.ModuleInfo.HasRoute(request))) != null)
-                {
-                    Info = Module.ModuleInfo;
-                    BumpOrEnqueueModule(Module);
-                    return true;
-                }
+                Info = Module.ModuleInfo;
+                BumpOrEnqueueModule(Module);
+                return true;
             }
 
-            var modInfo = Modules.FirstOrDefault(x => x.HasRoute(request));
+            var modInfo = Modules.FirstOrDefault(x => x != null && x.HasRoute(request));
 
             if (modInfo == null)
                 return false;
 
             Module = modInfo.GetInstance();
+
+            if (Module == null)
+            {
+                Logger.Write($"Got null instance: {modInfo}", Severity.Http, Severity.Warning);
+                return false;
+            }
             Info = modInfo;
             BumpOrEnqueueModule(Module);
             return true;
@@ -65,15 +68,26 @@ namespace MidiBackup.Http.RestService
 
         private void BumpOrEnqueueModule(RestModuleBase baseModule)
         {
-            if (CachedModules.ToArray().Any(x => x.Equals(baseModule)))
+            if(baseModule == null)
+            {
+                Logger.Write("Module null", Severity.Http, Severity.Critical);
+                return;
+            }
+
+            if (CachedModules.ToArray().Any(x => x != null && x.Equals(baseModule)))
             {
                 CachedModules.Remove(baseModule);
-                
             }
             CachedModules.AddFirst(baseModule);
 
             if (CachedModules.Count > cacheSize)
                 CachedModules.RemoveLast();
+
+            if(CachedModules.Any(x => x == null))
+            {
+                Logger.Write($"{Logger.BuildColoredString("Found null in cache, removing", ConsoleColor.Red)}", Severity.Http, Severity.Warning);
+                CachedModules.Remove((RestModuleBase)null);
+            }
         }
 
         public async Task<int> ProcessRestRequestAsync(HttpListenerContext context)
@@ -122,7 +136,10 @@ namespace MidiBackup.Http.RestService
             else
             {
                 if (result.Code == int.MaxValue)
+                {
+                    CachedModules.Remove(moduleBase);
                     return -1;
+                }
 
                 if (result.Data != null)
                 {

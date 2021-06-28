@@ -27,7 +27,7 @@ namespace MidiBackup.Http.Websocket.MessageTypes
         public PlaybackEvent(Playback playback)
         {
             this.IsPlaying = playback.IsPlaying;
-            this.TrackDuration = (long)playback.Duration.TotalSeconds;
+            this.TrackDuration = (long)((TimeSpan)playback.Duration).TotalSeconds;
             this.CurrentFile = playback.CurrentFileName;
             this.IsPaused = playback.IsPaused;
         }
