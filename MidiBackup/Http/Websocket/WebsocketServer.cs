@@ -127,6 +127,8 @@ namespace MidiBackup.Http.Websocket
                     return;
                 }
 
+                Logger.Debug($"Returning {nameof(result)} for {nameof(task)}", Severity.Websocket);
+
                 await client.SendAsync(result.BuildMessage());
             });
         }

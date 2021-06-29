@@ -24,7 +24,7 @@ namespace MidiBackup.Http.Websocket.MessageTypes
         [JsonProperty("currentFile")]
         public string CurrentFile { get; set; }
 
-        public PlaybackEvent(Playback playback)
+        public PlaybackEvent(MidiPlayback playback)
         {
             this.IsPlaying = playback.IsPlaying;
             this.TrackDuration = (long)((TimeSpan)playback.Duration).TotalSeconds;
@@ -33,7 +33,7 @@ namespace MidiBackup.Http.Websocket.MessageTypes
         }
 
 
-        public PlaybackEvent(Playback playback, long seek, long duration)
+        public PlaybackEvent(MidiPlayback playback, long seek, long duration)
             : this(playback)
         {
             this.CurrentSeek = seek;

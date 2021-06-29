@@ -12,7 +12,7 @@ using System.Timers;
 
 namespace MidiBackup
 {
-    public class Playback
+    public class MidiPlayback
     {
         public event Func<string, Task> PlaybackStarted;
         public event Func<Task> PlaybackStopped;
@@ -32,8 +32,10 @@ namespace MidiBackup
         private MidiClock Clock { get; set; }
         private MetricTimeSpan LastRead { get; set; } = TimeSpan.Zero;
         private Timer PlaybackEventTimer { get;}
-        
-        public Playback(MidiDriver driver)
+
+        private MidiEventToBytesConverter Converter { get; } = new MidiEventToBytesConverter();
+
+        public MidiPlayback(MidiDriver driver)
         {
             this.Driver = driver;
             this.Driver.OnMidiClock += Driver_OnMidiClock;
@@ -86,21 +88,21 @@ namespace MidiBackup
                 var newEvents = Events.Where(x =>
                 {
                     var pTS = x.TimeAs<MetricTimeSpan>(TempoMap);
-                    if (pTS.TotalMicroseconds <= ts.TotalMicroseconds && pTS.TotalMicroseconds > LastRead.TotalMicroseconds && Driver.Config.Debug)
-                        Logger.Write($"Got event {x.Event.EventType} -- {pTS.TotalMicroseconds} <= {ts.TotalMicroseconds} && {pTS.TotalMicroseconds} > {LastRead.TotalMicroseconds}", Severity.MIDI, Severity.Log);
+                    if (pTS.TotalMicroseconds <= ts.TotalMicroseconds && pTS.TotalMicroseconds > LastRead.TotalMicroseconds)
+                        Logger.Debug($"Got event {x.Event.EventType} -- {pTS.TotalMicroseconds} <= {ts.TotalMicroseconds} && {pTS.TotalMicroseconds} > {LastRead.TotalMicroseconds}", Severity.MIDI, Severity.Log);
                     return pTS.TotalMicroseconds <= ts.TotalMicroseconds && pTS.TotalMicroseconds > LastRead.TotalMicroseconds;
                 }).ToArray();
 
                 var tmpLast = LastRead;
                 LastRead = ts;
 
+                if (newEvents.Length == 0)
+                    return;
+
                 var buff = BuildPacket(newEvents.Select(x => GetMessage(x)).ToArray());
 
-                if (Driver.Config.Debug)
-                {
-                    Logger.Write($"{tmpLast.TotalMicroseconds} - {ts.TotalMicroseconds} : {newEvents.Count()}", Severity.MIDI, Severity.Log);
-                }
-                
+                Logger.Debug($"{tmpLast.TotalMicroseconds} - {ts.TotalMicroseconds} : {newEvents.Count()}", Severity.MIDI);
+
                 if (buff != null && buff.Length > 0)
                 {
                     if (!IsPlaying || IsPaused)
@@ -147,8 +149,7 @@ namespace MidiBackup
                 Events.Clear();
                 Events = CurrentFile.GetTimedEvents().ToList();
 
-                if(Driver.Config.Debug)
-                    Logger.Write($"{string.Join("\n", Events.Select(x => $"{x.Time} - {x.Event.EventType}"))}");
+                Logger.Debug($"{string.Join("\n", Events.Select(x => $"{x.Time} - {x.Event.EventType}"))}", Severity.MIDI);
 
                 LastRead = TimeSpan.Zero;
 
@@ -186,7 +187,7 @@ namespace MidiBackup
 
             List<byte> buff = new List<byte>();
 
-            foreach (var item in msg)
+            foreach (var item in msg.Where(x => x != null))
                 buff.AddRange(item.Build());
 
             return buff.ToArray();
@@ -195,6 +196,9 @@ namespace MidiBackup
         private OutgoingMidiMessage GetMessage(TimedEvent e)
         {
             if (!IsPlaying)
+                return null;
+
+            if (e == null)
                 return null;
 
             try
@@ -215,6 +219,15 @@ namespace MidiBackup
                         {
                             var controlChange = (ControlChangeEvent)e.Event;
                             return new CCMessage(controlChange.Channel, (CCType)(byte)controlChange.ControlNumber, controlChange.ControlValue);
+                        }
+                    default:
+                        {
+                            var buff = Converter.Convert(e.Event);
+
+                            Logger.Write($"[{LastRead.TotalMicroseconds} - {e.TimeAs<MetricTimeSpan>(TempoMap).TotalMicroseconds}] Unknown handler: {e.Event.EventType} Sending 0x{string.Join("", buff.Select(x => x.ToString("X2")))}", Severity.MIDI);
+
+                            
+                            return new DefaultOutgoing(buff);
                         }
                 }
             }

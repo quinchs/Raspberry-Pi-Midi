@@ -18,7 +18,9 @@ namespace MidiBackup
         Writer,
         Driver,
         Critical,
-        Websocket
+        Websocket,
+        FileManager,
+        Debug
     }
     public class Logger
     {
@@ -44,6 +46,25 @@ namespace MidiBackup
            => _logEvent?.Invoke(null, (data, new Severity[] { sev }));
         public static void Write(object data, params Severity[] sevs)
             => _logEvent?.Invoke(null, (data, sevs));
+
+        public static void Debug(object data, Severity sev = Severity.Log)
+        {
+            if (Program.Config.Debug)
+                Write(data, Severity.Debug, sev);
+        }
+
+        public static void Debug(object data, params Severity[] sevs)
+        {
+            if (Program.Config.Debug)
+            {
+                List<Severity> severs = new List<Severity>();
+                severs.Add(Severity.Debug);
+                severs.AddRange(sevs);
+
+                Write(data, severs.ToArray());
+            }
+        }
+
         public static void WriteVariable(params (string, object)[] data)
         {
             foreach (var item in data)
@@ -152,6 +173,8 @@ namespace MidiBackup
             { Severity.Reader, ConsoleColor.DarkGreen },
             { Severity.Writer, ConsoleColor.DarkBlue },
             { Severity.Websocket, ConsoleColor.Gray },
+            { Severity.FileManager, ConsoleColor.DarkRed },
+            { Severity.Debug, ConsoleColor.Blue }
         };
 
         public static string BuildColoredString(object s, ConsoleColor color)

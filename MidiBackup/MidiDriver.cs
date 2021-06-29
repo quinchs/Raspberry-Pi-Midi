@@ -13,9 +13,10 @@ namespace MidiBackup
     public partial class MidiDriver
     {
         public MidiRecorder Recorder { get; private set; }
-        public Playback Playback { get; private set; }
-        public Reader Reader { get; private set; }
-        public Writer Writer { get; private set; }
+        public MidiPlayback Playback { get; private set; }
+        public MidiReader Reader { get; private set; }
+        public MidiWriter Writer { get; private set; }
+        public MidiFileManager FileManager { get; private set; }
 
         public string DeviceName { get; private set; }
 
@@ -46,8 +47,9 @@ namespace MidiBackup
             Watcher.EnableRaisingEvents = true;
             Watcher.IncludeSubdirectories = true;
 
-            Playback = new Playback(this);
+            Playback = new MidiPlayback(this);
             Recorder = new MidiRecorder(this);
+            FileManager = new MidiFileManager(this);
         }
 
         public async Task Start()
@@ -61,9 +63,9 @@ namespace MidiBackup
 
                 OpenMidiStream(MidiFile);
                 if (Reader == null)
-                    Reader = new Reader(this);
+                    Reader = new MidiReader(this);
                 if (Writer == null)
-                    Writer = new Writer(this);
+                    Writer = new MidiWriter(this);
                 DeviceName = $"{MidiFile.Split("/").Last()}";
                 ResumeRead();
 
@@ -118,9 +120,9 @@ namespace MidiBackup
                     Thread.Sleep(500);
                     OpenMidiStream(e.FullPath);
                     if (Reader == null)
-                        Reader = new Reader(this);
+                        Reader = new MidiReader(this);
                     if (Writer == null)
-                        Writer = new Writer(this);
+                        Writer = new MidiWriter(this);
 
                     DeviceName = $"{e.Name}";
                     ResumeRead();

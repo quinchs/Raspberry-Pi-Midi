@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MidiBackup
 {
-    public class Parser
+    public class MidiPacketParser
     {
         public IEnumerable<MidiMessage> Parse(byte[] bytes, int index, int size)
         {

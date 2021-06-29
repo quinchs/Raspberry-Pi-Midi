@@ -8,12 +8,12 @@ using System.Threading.Tasks;
 
 namespace MidiBackup
 {
-    public class Writer
+    public class MidiWriter
     {
         private MidiDriver Driver;
         private Stream Stream
             => Driver.MidiStream;
-        public Writer(MidiDriver driver)
+        public MidiWriter(MidiDriver driver)
         {
             this.Driver = driver;
         }
@@ -23,8 +23,7 @@ namespace MidiBackup
             if (buff.Length == 0)
                 return;
 
-            if (Driver.Config.Debug)
-                Logger.Write($"Sending {buff.Length} bytes to midi device: {BitConverter.ToString(buff).Replace("-", "")}", Severity.MIDI, Severity.Writer);
+            Logger.Debug($"Sending {buff.Length} bytes to midi device: {BitConverter.ToString(buff).Replace("-", "")}", Severity.MIDI, Severity.Writer);
 
             await Stream.WriteAsync(buff);
             await Stream.FlushAsync();

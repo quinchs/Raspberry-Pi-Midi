@@ -8,16 +8,16 @@ using System.Threading.Tasks;
 
 namespace MidiBackup
 {
-    public class Reader
+    public class MidiReader
     {
-        private Parser Parser;
+        private MidiPacketParser Parser;
         private MidiDriver Driver;
         private FileStream Stream
             => Driver.MidiStream;
-        public Reader(MidiDriver driver)
+        public MidiReader(MidiDriver driver)
         {
             this.Driver = driver;
-            Parser = new Parser();
+            Parser = new MidiPacketParser();
         }
 
         public async Task ReaderAsync()
@@ -42,8 +42,8 @@ namespace MidiBackup
 
                     foreach (var ev in mEv)
                     {
-                        if (Driver.Config.Debug && ev.Status != StatusType.MidiClock && ev.Status != StatusType.ActiveSense)
-                            Logger.Write($"{mEv.Count()} - {BitConverter.ToString(buff.Take(l).ToArray()).Replace("-", "")}\nRead {l}/{buff.Length} : {ev}\n", Severity.Driver, Severity.Reader);
+                        if (ev.Status != StatusType.MidiClock && ev.Status != StatusType.ActiveSense)
+                            Logger.Debug($"{mEv.Count()} - {BitConverter.ToString(buff.Take(l).ToArray()).Replace("-", "")}\nRead {l}/{buff.Length} : {ev}\n", Severity.Driver, Severity.Reader);
                         Driver.DispatchMessageEvent(ev);
                     }
                 }

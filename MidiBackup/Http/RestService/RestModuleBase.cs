@@ -27,7 +27,7 @@ namespace MidiBackup.Http
         public MidiRecorder Recorder
             => Driver.Recorder;
 
-        public Playback Playback
+        public MidiPlayback Playback
             => Driver.Playback;
 
         public Task AcceptWebsocketAsync()

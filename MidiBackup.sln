@@ -3,18 +3,24 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31410.357
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MidiBackup", "MidiBackup\MidiBackup.csproj", "{15CA770A-772F-421A-97BA-10B69A7D64B5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MidiBackup", "MidiBackup\MidiBackup.csproj", "{15CA770A-772F-421A-97BA-10B69A7D64B5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|ARM64 = Debug|ARM64
 		Release|Any CPU = Release|Any CPU
+		Release|ARM64 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Debug|ARM64.Build.0 = Debug|ARM64
 		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Release|ARM64.ActiveCfg = Release|ARM64
+		{15CA770A-772F-421A-97BA-10B69A7D64B5}.Release|ARM64.Build.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,4 +1,6 @@
-﻿using MidiBackup.Http.RestService;
+﻿using Melanchall.DryWetMidi.Core;
+using Melanchall.DryWetMidi.Interaction;
+using MidiBackup.Http.RestService;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,13 +19,34 @@ namespace MidiBackup.Http.Routes
         {
             var files = Directory.GetFiles(MidiDir);
 
-            return RestResult.OK.WithData(files.Select(x => 
+            Dictionary<string, double> midiFiles = new Dictionary<string, double>();
+
+            foreach(var file in files)
             {
-                var spl = x.Split("_");
+                try
+                {
+                    var midiFile = MidiFile.Read(file);
+                    if (midiFile != null)
+                    {
+                        var duration = midiFile.GetTimedEvents()
+                            .LastOrDefault(e => e.Event is NoteOffEvent)
+                            ?.TimeAs<MetricTimeSpan>(midiFile.GetTempoMap() ?? TempoMap.Default) ?? new MetricTimeSpan();
+
+                        midiFiles.Add(file.Replace($"{MidiDir}/", ""), ((TimeSpan)duration).TotalSeconds);
+                    }
+                }
+                catch(Exception x)
+                {
+                    Logger.Write($"Invalid midi file at {file} - {x}", Severity.Http, Severity.Warning);
+                }
+            }
+
+            return RestResult.OK.WithData(midiFiles.Select(x => 
+            {
                 return new
                 {
-                    duration = spl[1].Replace(".midi", ""),
-                    name = x.Split("/").Last()
+                    duration = x.Value,
+                    name = x.Key
                 };
             }));
         }
