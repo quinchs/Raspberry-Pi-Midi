@@ -17,41 +17,10 @@ namespace MidiBackup.Http.Routes
         [Route("/midi", "GET")]
         public async Task<RestResult> ListMidiFiles()
         {
-            var files = Directory.GetFiles(MidiDir);
-
-            Dictionary<string, double> midiFiles = new Dictionary<string, double>();
-
-            foreach(var file in files)
-            {
-                try
-                {
-                    var midiFile = MidiFile.Read(file);
-                    if (midiFile != null)
-                    {
-                        var duration = midiFile.GetTimedEvents()
-                            .LastOrDefault(e => e.Event is NoteOffEvent)
-                            ?.TimeAs<MetricTimeSpan>(midiFile.GetTempoMap() ?? TempoMap.Default) ?? new MetricTimeSpan();
-
-                        midiFiles.Add(file.Replace($"{MidiDir}/", ""), ((TimeSpan)duration).TotalSeconds);
-                    }
-                }
-                catch(Exception x)
-                {
-                    Logger.Write($"Invalid midi file at {file} - {x}", Severity.Http, Severity.Warning);
-                }
-            }
-
-            return RestResult.OK.WithData(midiFiles.Select(x => 
-            {
-                return new
-                {
-                    duration = x.Value,
-                    name = x.Key
-                };
-            }));
+            return RestResult.OK.WithData(Driver.FileManager.Files);
         }
 
-        [Route("/midi/get/{file}", "GET")]
+        [Route("/midi/download/{file}", "GET")]
         public async Task<RestResult> GetMidiFile(string file)
         {
             var path = MidiDir + $"{Path.DirectorySeparatorChar}{file}";
@@ -64,6 +33,14 @@ namespace MidiBackup.Http.Routes
             Response.Headers.Add("Content-Type", "audio/midi");
 
             return RestResult.OK;
+        }
+
+        [Route("/midi/rename/{file}?new={newFile}", "PATCH")]
+        public async Task<RestResult> RenameMidiFile(string file, string newFile) 
+        {
+            var result = FileManager.TryRenameFile(file, newFile, out var meta);
+
+            return result ? RestResult.OK.WithData(meta) : RestResult.BadRequest;
         }
     }
 }

@@ -33,7 +33,17 @@ namespace MidiBackup.Http.Websocket
             this.Server.Driver.Playback.PlaybackStopped  += SendPlaybackStatus;
             this.Server.Driver.Playback.MidiTimeUpdated  += SendPlaybackSeek;
 
+            this.Server.Driver.OnMetadataCreated += (arg1) => SendFileEvent(FileEventType.Created, arg1);
+            this.Server.Driver.OnMetadataDeleted += (arg1) => SendFileEvent(FileEventType.Deleted, arg1);
+            this.Server.Driver.OnMetadataUpdated += (arg1, arg2) => SendFileEvent(FileEventType.Updated, arg2);
+
             Logger.Write($"Websocket server {Logger.BuildColoredString("Online", ConsoleColor.Green)}!", Severity.Websocket);
+        }
+
+        private Task SendFileEvent(FileEventType type, MidiFileMetadata newMeta)
+        {
+            SendToAll(new FileEvent(type, newMeta, this.Server.Driver.FileManager.Files).BuildMessage());
+            return Task.CompletedTask;
         }
 
         private Task SendPlaybackSeek(long arg1, long arg2)

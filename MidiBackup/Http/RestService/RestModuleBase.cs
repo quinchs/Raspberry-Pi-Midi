@@ -30,6 +30,9 @@ namespace MidiBackup.Http
         public MidiPlayback Playback
             => Driver.Playback;
 
+        public MidiFileManager FileManager
+            => Driver.FileManager;
+
         public Task AcceptWebsocketAsync()
             => RestServer._websocketServer.AcceptWebsocketRequestAsync(this.Context);
 

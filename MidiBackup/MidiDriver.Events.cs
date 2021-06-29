@@ -43,7 +43,26 @@ namespace MidiBackup
 
     public partial class MidiDriver
     {
+        public event Func<MidiFileMetadata, Task> OnMetadataCreated
+        {
+            add    => this.FileManager.OnMetadataCreated += value;
+            remove => this.FileManager.OnMetadataCreated -= value;
+        }
+
+        public event Func<MidiFileMetadata, MidiFileMetadata, Task> OnMetadataUpdated
+        {
+            add    => this.FileManager.OnMetadataUpdated += value;
+            remove => this.FileManager.OnMetadataUpdated -= value;
+        }
+
+        public event Func<MidiFileMetadata, Task> OnMetadataDeleted
+        {
+            add    => this.FileManager.OnMetadataDeleted += value;
+            remove => this.FileManager.OnMetadataDeleted -= value;
+        }
+
         public event Func<Task> DeviceDisconnected;
+
         public event Func<Task> DeviceConnected;
 
         public event Func<Task> OnMidiClock;

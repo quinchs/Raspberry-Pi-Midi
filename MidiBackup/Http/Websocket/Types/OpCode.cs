@@ -12,6 +12,7 @@ namespace MidiBackup.Http.Websocket
         FileUpdate = 1,
         RemotePlayerCommand = 2,
         PlaybackEvent = 3,
+        FileEvent = 4,
 
         CommandResult = 69,
     }

@@ -40,12 +40,21 @@ namespace MidiBackup
             return this;
         }
 
+        public override string ToString()
+        {
+            return $"{this.FileName} - {Math.Ceiling(this.Duration)}s";
+        }
+
         public MidiFileMetadata Clone()
             => this.MemberwiseClone() as MidiFileMetadata;
     }
 
     public class MidiFileManager
     {
+        public event Func<MidiFileMetadata, Task> OnMetadataCreated;
+        public event Func<MidiFileMetadata, MidiFileMetadata, Task> OnMetadataUpdated;
+        public event Func<MidiFileMetadata, Task> OnMetadataDeleted;
+
         public static string MidiFileDirectory { get; } = $"{Environment.CurrentDirectory}/MidiFiles";
         public static string MidiMetaPath { get; } = $"{Environment.CurrentDirectory}/midi.meta";
 
@@ -76,6 +85,27 @@ namespace MidiBackup
             Watcher.Changed += Watcher_Changed;
         }
 
+        public bool TryRenameFile(string oldFile, string newFile, out MidiFileMetadata meta)
+        {
+            meta = null;
+
+            var oldMeta = _files.FirstOrDefault(x => x.FileName == oldFile);
+
+            if (oldMeta == null)
+                return false;
+
+            meta = oldMeta.Clone().Update(newFile);
+
+            if (meta == null)
+                return false;
+
+            _files.Replace(oldMeta, meta);
+
+            Driver.DispatchEvent(OnMetadataUpdated, oldMeta, meta);
+
+            return true;
+        }
+
         private void Watcher_Changed(object sender, FileSystemEventArgs e)
         {
             var meta = _files.FirstOrDefault(x => x.FileName == e.Name);
@@ -99,9 +129,15 @@ namespace MidiBackup
 
             var duration = file.GetFileDuration();
 
-            if (_files.Replace(meta, meta.Clone().Update(e.Name, duration.TotalSeconds)) == 0)
+            var newMeta = meta.Clone().Update(e.Name, duration.TotalSeconds);
+
+            if (_files.Replace(meta, newMeta) == 0)
                 Logger.Debug($"Update returned 0 for {e.Name}", Severity.FileManager, Severity.Warning);
-            else SaveMetadata();
+            else
+            {
+                SaveMetadata();
+                Driver.DispatchEvent(OnMetadataUpdated, meta, newMeta);
+            }
         }
 
         private void Watcher_Deleted(object sender, FileSystemEventArgs e)
@@ -115,6 +151,7 @@ namespace MidiBackup
 
             _files.Remove(meta);
             SaveMetadata();
+            Driver.DispatchEvent(OnMetadataDeleted, meta);
         }
 
         private void Watcher_Created(object sender, FileSystemEventArgs e)
@@ -142,6 +179,8 @@ namespace MidiBackup
             var meta = new MidiFileMetadata(e.Name, duration.TotalSeconds);
             _files.Add(meta);
             SaveMetadata();
+            Driver.DispatchEvent(OnMetadataCreated, meta);
+            Logger.Write($"New midi file metadata added: {meta}", Severity.FileManager, Severity.Log);
         }
 
         public void LoadMetadata()
