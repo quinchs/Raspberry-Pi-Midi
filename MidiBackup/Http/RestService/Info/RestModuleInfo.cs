@@ -32,7 +32,7 @@ namespace MidiBackup.Http.RestService.Info
         public bool HasRoute(HttpListenerRequest request)
             => Routes.Any(x =>
             {
-                Logger.Write($"{x == null} {x}", Severity.Http, Severity.Log);
+                Logger.Debug($"{x == null} {x}", Severity.Http, Severity.Log);
                 try
                 {
                     return x.IsMatch(request.RawUrl, request.HttpMethod);

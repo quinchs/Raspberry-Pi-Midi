@@ -1,4 +1,5 @@
-﻿using Melanchall.DryWetMidi.Core;
+﻿using HttpMultipartParser;
+using Melanchall.DryWetMidi.Core;
 using Melanchall.DryWetMidi.Interaction;
 using MidiBackup.Http.RestService;
 using System;
@@ -41,6 +42,35 @@ namespace MidiBackup.Http.Routes
             var result = FileManager.TryRenameFile(file, newFile, out var meta);
 
             return result ? RestResult.OK.WithData(meta) : RestResult.BadRequest;
+        }
+
+        [Route("/midi/upload", "POST")]
+        public async Task<RestResult> UploadMidiFile()
+        {
+            if (!Request.HasEntityBody)
+                return RestResult.BadRequest;
+
+            var formData = await MultipartFormDataParser.ParseAsync(Request.InputStream, Encoding.UTF8);
+
+            var midiFileData = formData.Files.FirstOrDefault(x => x != null && x.Name == "midi");
+
+            if (midiFileData == null)
+                return RestResult.BadRequest;
+
+            MidiFile midiFile = null;
+
+            try
+            {
+                midiFile = MidiFile.Read(midiFileData.Data);
+            }
+            catch(Exception x)
+            {
+                Logger.Debug($"Invalid midi file {x}", Severity.Http, Severity.Warning);
+                return RestResult.BadRequest;
+            }
+
+            FileManager.AddMidiFile(midiFile, midiFileData.FileName);
+            return RestResult.OK;
         }
     }
 }

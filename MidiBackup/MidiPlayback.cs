@@ -256,8 +256,10 @@ namespace MidiBackup
 
                 _ = Task.Run(async () =>
                 {
+                    Logger.Write("Sending stop packets...", Severity.MIDI);
                     await Driver.Writer.WritePacket((byte)StatusType.CC, (byte)CCType.AllNotesOff, 0x00);
                     await Driver.Writer.WritePacket((byte)StatusType.CC, (byte)CCType.AllSoundOff, 0x00);
+                    Logger.Write("Stop packets sent", Severity.MIDI);
                 });
 
                 Driver.DispatchEvent(PlaybackStopped);

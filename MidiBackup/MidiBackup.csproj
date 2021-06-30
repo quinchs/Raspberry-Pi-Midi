@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -23,6 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="HttpMultipartParser" Version="5.0.0" />
     <PackageReference Include="managed-midi" Version="1.9.14" />
     <PackageReference Include="Melanchall.DryWetMidi" Version="5.2.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />

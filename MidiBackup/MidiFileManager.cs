@@ -85,6 +85,11 @@ namespace MidiBackup
             Watcher.Changed += Watcher_Changed;
         }
 
+        public void AddMidiFile(MidiFile midi, string name)
+        {
+            midi.Write(MidiFileDirectory + $"/{name}");
+        }
+
         public bool TryRenameFile(string oldFile, string newFile, out MidiFileMetadata meta)
         {
             meta = null;
