@@ -12,12 +12,19 @@ namespace MidiBackup
 {
     public class MidiFileMetadata
     {
+        [JsonProperty("fileName")]
         public string FileName { get; private set; }
+
+        [JsonProperty("recordDate")]
         public DateTime RecordDate { get; private set; }
+        
+        [JsonProperty("duration")]
         public double Duration { get; private set; }
 
+        [JsonProperty("lastUpdated")]
         public DateTime LastUpdated { get; private set; }
 
+        [JsonIgnore]
         public bool FileExists
             => File.Exists($"{MidiFileManager.MidiFileDirectory}/{FileName}");
 
